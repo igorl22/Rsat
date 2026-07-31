@@ -1,82 +1,140 @@
-# RSAT PowerShell — Windows 11
+# RSAT PowerShell — установка с FoD ISO на флешке
 
-Набор PowerShell-команд и готовых скриптов для установки RSAT в среде с WSUS и без прямого доступа к Windows Update.
+Этот репозиторий предназначен прежде всего для **офлайн-установки RSAT с флешки**, на которой находятся ISO Windows Features on Demand.
 
-## Содержимое
+## Структура флешки
 
-- `scripts/Install-RSAT-Online.ps1` — установка RSAT через Windows Update.
-- `scripts/Install-RSAT-From-FoD.ps1` — установка RSAT из смонтированного ISO Features on Demand.
-- `scripts/Install-RSAT-ADUC.ps1` — установка Active Directory Users and Computers.
-- `scripts/Install-RSAT-GroupPolicy.ps1` — установка Group Policy Management.
-- `scripts/Install-RSAT-DHCP.ps1` — установка DHCP Management Tools.
-- `scripts/Install-RSAT-All.ps1` — установка всех доступных компонентов RSAT.
-- `scripts/Get-RSAT-Status.ps1` — проверка состояния компонентов.
-- `scripts/Set-WSUS-TemporaryBypass.ps1` — временно отключить использование WSUS.
-- `scripts/Restore-WSUS.ps1` — вернуть использование WSUS.
+Скрипт ожидает следующую структуру:
 
-## Запуск
-
-Откройте PowerShell **от имени администратора**.
-
-Проверка состояния:
-
-```powershell
-Get-WindowsCapability -Online -Name 'Rsat*' |
-    Select-Object Name, State
+```text
+F:\FoD\21H2\<FoD ISO-файл>.iso
+F:\FoD\22H2_23H2\<FoD ISO-файл>.iso
+F:\FoD\24H2\<FoD ISO-файл>.iso
 ```
 
-Установка ADUC:
+Буква флешки может быть любой. Скрипт ищет папку `FoD` автоматически.
 
-```powershell
-.\scripts\Install-RSAT-ADUC.ps1
+## Самый простой запуск
+
+1. Скачайте репозиторий: **Code → Download ZIP**.
+2. Распакуйте папку на флешку рядом с папкой `FoD` или в любое другое место.
+3. Запустите двойным щелчком:
+
+```text
+Start-RSAT-USB.cmd
 ```
 
-Установка с FoD ISO:
+Файл сам запросит права администратора и запустит PowerShell.
 
-```powershell
-.\scripts\Install-RSAT-From-FoD.ps1 -Source 'D:\LanguagesAndOptionalFeatures'
+## Что делает автоматический скрипт
+
+`scripts/Install-RSAT-From-USB.ps1`:
+
+1. Определяет сборку установленной Windows.
+2. Выбирает правильную папку FoD.
+3. Находит ISO на подключённой флешке.
+4. Монтирует ISO.
+5. Находит каталог с CAB-пакетами.
+6. Показывает меню компонентов RSAT.
+7. Устанавливает компоненты с параметрами `-Source` и `-LimitAccess`.
+8. Показывает результат и отключает ISO.
+
+## Соответствие версий
+
+| Сборка Windows | Версия | Папка на флешке |
+|---|---|---|
+| 22000 | Windows 11 21H2 | `FoD\21H2` |
+| 22621 / 22631 | Windows 11 22H2 / 23H2 | `FoD\22H2_23H2` |
+| 26100 | Windows 11 24H2 | `FoD\24H2` |
+
+## Меню установки
+
+После запуска можно выбрать:
+
+```text
+[1] ADUC + модуль Active Directory PowerShell
+[2] Group Policy Management
+[3] DHCP Management Tools
+[4] Все отсутствующие компоненты RSAT
+[5] ADUC + Group Policy + DHCP
 ```
 
-Либо для вашей структуры:
+Для большинства рабочих компьютеров удобен вариант **5**.
+
+## Запуск непосредственно из PowerShell
+
+Откройте PowerShell от имени администратора и выполните:
 
 ```powershell
-.\scripts\Install-RSAT-From-FoD.ps1 -Source 'F:\FoD\24H2'
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\scripts\Install-RSAT-From-USB.ps1
 ```
 
-## Соответствие версий FoD
-
-ISO Features on Demand должно соответствовать сборке Windows:
-
-- Windows 11 21H2 — build 22000
-- Windows 11 22H2 / 23H2 — build 22621 / 22631
-- Windows 11 24H2 — build 26100
-
-Проверить текущую сборку:
+Установить ADUC без меню:
 
 ```powershell
-Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsBuildNumber
+.\scripts\Install-RSAT-From-USB.ps1 -Component ADUC
+```
+
+Установить все RSAT без меню:
+
+```powershell
+.\scripts\Install-RSAT-From-USB.ps1 -Component All
+```
+
+Если автоматический поиск флешки не сработал, укажите её букву:
+
+```powershell
+.\scripts\Install-RSAT-From-USB.ps1 -UsbRoot F:\
+```
+
+## Проверка после установки
+
+Проверить установленные RSAT:
+
+```powershell
+.\scripts\Get-RSAT-Status.ps1
+```
+
+Запуск консолей:
+
+```powershell
+dsa.msc       # Active Directory Users and Computers
+gpmc.msc      # Group Policy Management
+dhcpmgmt.msc  # DHCP Management
+```
+
+Проверить модуль Active Directory:
+
+```powershell
+Import-Module ActiveDirectory
+Get-Module ActiveDirectory
 ```
 
 ## Частые ошибки
 
+### ISO не найден
+
+Проверьте, что ISO лежит внутри соответствующей папки:
+
+```text
+<буква флешки>:\FoD\24H2\
+```
+
+### 0x800f081f или 0x800f0912
+
+Обычно FoD ISO не соответствует сборке Windows либо это не Features on Demand ISO.
+
+Проверьте сборку:
+
+```powershell
+(Get-CimInstance Win32_OperatingSystem).BuildNumber
+```
+
 ### 0x800f0954
 
-Обычно компьютер пытается получить компонент через WSUS. Временно переключите установку на Windows Update:
+При использовании нового автоматического скрипта WSUS не должен участвовать, поскольку установка выполняется с `-LimitAccess`. Временно менять `UseWUServer` обычно не требуется.
 
-```powershell
-Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' `
-    -Name UseWUServer -Value 0
-Restart-Service wuauserv
-```
+## Дополнительные скрипты
 
-После установки верните значение:
-
-```powershell
-Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' `
-    -Name UseWUServer -Value 1
-Restart-Service wuauserv
-```
-
-### 0x800f081f / 0x800f0912
-
-Чаще всего источник FoD не соответствует версии Windows либо указан неправильный каталог. Используйте подходящий ISO и параметр `-LimitAccess`.
+В папке `scripts` также оставлены отдельные команды для ручной установки, проверки RSAT и сценария через Windows Update. Основной рекомендуемый файл для этой флешки — `Start-RSAT-USB.cmd`.
