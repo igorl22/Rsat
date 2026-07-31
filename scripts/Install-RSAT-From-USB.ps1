@@ -1,7 +1,7 @@
 #requires -RunAsAdministrator
 [CmdletBinding()]
 param(
-    [ValidateSet('Menu','ADUC','GroupPolicy','DHCP','All')]
+    [ValidateSet('Menu','ADUC','GroupPolicy','DHCP','MySet','All')]
     [string]$Component = 'Menu',
 
     [string]$UsbRoot
@@ -146,15 +146,15 @@ function Select-Component {
     Write-Host '[1] ADUC + Active Directory PowerShell module'
     Write-Host '[2] Group Policy Management'
     Write-Host '[3] DHCP Management Tools'
-    Write-Host '[4] All missing RSAT components'
-    Write-Host '[5] ADUC + Group Policy + DHCP'
+    Write-Host '[4] My RSAT set (10 components)'
+    Write-Host '[5] All missing RSAT components'
 
     switch (Read-Host 'Choose an option') {
         '1' { 'ADUC' }
         '2' { 'GroupPolicy' }
         '3' { 'DHCP' }
-        '4' { 'All' }
-        '5' { 'Core' }
+        '4' { 'MySet' }
+        '5' { 'All' }
         default { throw 'Invalid menu selection.' }
     }
 }
@@ -166,11 +166,18 @@ function Get-CapabilityNames {
         'ADUC' { @('Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0') }
         'GroupPolicy' { @('Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0') }
         'DHCP' { @('Rsat.DHCP.Tools~~~~0.0.1.0') }
-        'Core' {
+        'MySet' {
             @(
                 'Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0',
+                'Rsat.CertificateServices.Tools~~~~0.0.1.0',
+                'Rsat.DHCP.Tools~~~~0.0.1.0',
+                'Rsat.Dns.Tools~~~~0.0.1.0',
+                'Rsat.FileServices.Tools~~~~0.0.1.0',
                 'Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0',
-                'Rsat.DHCP.Tools~~~~0.0.1.0'
+                'Rsat.RemoteAccess.Management.Tools~~~~0.0.1.0',
+                'Rsat.RemoteDesktop.Services.Tools~~~~0.0.1.0',
+                'Rsat.ServerManager.Tools~~~~0.0.1.0',
+                'Rsat.WSUS.Tools~~~~0.0.1.0'
             )
         }
         'All' {
@@ -211,7 +218,11 @@ try {
 
     Write-Section 'Installation'
     foreach ($capability in $capabilities) {
-        $current = Get-WindowsCapability -Online -Name $capability
+        $current = Get-WindowsCapability -Online -Name $capability -ErrorAction SilentlyContinue
+        if (-not $current) {
+            Write-Warning "Capability is not available on this Windows build: $capability"
+            continue
+        }
         if ($current.State -eq 'Installed') {
             Write-Host "Already installed: $capability" -ForegroundColor DarkGreen
             continue
